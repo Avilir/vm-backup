@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 VMB = os.path.basename(__file__)
 CFG = f"{VMB.split('.')[0]}.cfg"
 
+
 class Arguments:
     def __init__(self):
         """

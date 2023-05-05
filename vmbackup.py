@@ -53,7 +53,7 @@ logging.basicConfig(
 )
 
 
-def no_verbose(msg='', level=logging.INFO):
+def no_verbose(msg="", level=logging.INFO):
     logger.log(level=level, msg=msg)
 
 
@@ -508,15 +508,15 @@ def main(session):
     sub_suffix = f"{os.uname()[1]} {BASE_NAME}.py"
     if error_cnt > 0:
         status_log_end(server_name, f"ERROR,{summary}")
-        send_email(f'ERROR {sub_suffix}', status_log)
+        send_email(f"ERROR {sub_suffix}", status_log)
         verbose(f"{BASE_NAME} ended - ** ERRORS DETECTED ** - {summary}")
     elif warning_cnt > 0:
         status_log_end(server_name, f"WARNING,{summary}")
-        send_email(f'WARNING {sub_suffix}', status_log)
+        send_email(f"WARNING {sub_suffix}", status_log)
         verbose(f"{BASE_NAME} ended - ** WARNING(s) ** - {summary}")
     else:
         status_log_end(server_name, f"SUCCESS,{summary}")
-        send_email(f'Success {sub_suffix}', status_log)
+        send_email(f"Success {sub_suffix}", status_log)
         verbose(f"{BASE_NAME} ended - Success - {summary}")
 
     # done with main()
@@ -975,7 +975,8 @@ def send_email(subject, body_fname):
 
     # trunc status log file after email it
     status_log = config.get(section, "status_log", fallback=DEFAULT_STATUS_LOG)
-    open(status_log, 'w').close()
+    open(status_log, "w").close()
+
 
 def is_xe_master():
     """

@@ -8,8 +8,8 @@ import os
 # Local modules
 
 # ############################ HARD CODED DEFAULTS
-DEFAULT_USER = 'root'
-DEFAULT_XENSERVER = ' localhost'
+DEFAULT_USER = "root"
+DEFAULT_XENSERVER = " localhost"
 
 # modify these hard coded default values, only used if not specified in config file
 DEFAULT_POOL_DB_BACKUP = 0

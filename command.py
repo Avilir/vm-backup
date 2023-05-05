@@ -142,11 +142,11 @@ class Command:
 
     def path_exists(self, path):
         command = f"/usr/bin/touch {path}"
-        return self.run_remote(command, out_format='rc')
+        return self.run_remote(command, out_format="rc")
 
     def path_delete(self, path):
         command = f"rm -rf {path}"
-        return self.run_remote(command, out_format='rc')
+        return self.run_remote(command, out_format="rc")
 
     def write_to_file(self, filename, data):
         for line in data:
