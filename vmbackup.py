@@ -153,8 +153,7 @@ def main(session):
         this_status = "success"
 
         # get values from vdi-export=
-        vm_name = get_vm_name(vm_parm)
-        vm_max_backups = get_vm_max_backups(vm_parm)
+        vm_name, vm_max_backups = get_vm_info(vm_parm)
         verbose(f"vdi-export - vm_name: {vm_name} max_backups: {vm_max_backups}")
 
         status_log_vdi_export_begin(server_name, vm_name)
@@ -346,8 +345,7 @@ def main(session):
         this_status = "success"
 
         # get values from vdi-export=
-        vm_name = get_vm_name(vm_parm)
-        vm_max_backups = get_vm_max_backups(vm_parm)
+        vm_name, vm_max_backups = get_vm_info(vm_parm)
         verbose(f"vm-export - vm_name: {vm_name} max_backups: {vm_max_backups}")
 
         status_log_vm_export_begin(server_name, vm_name)
@@ -523,17 +521,19 @@ def main(session):
     ######################################################################
 
 
-def get_vm_max_backups(vm_parm):
+def get_vm_info(vm_parm):
     # get max_backups from optional vm-export=VM-NAME:MAX-BACKUP override
     # NOTE - if not present then return config['max_backups']
     data = vm_parm.split(":")
+    vm_name = data[0]
     try:
-        res = int(data[1])
+        mxb = int(data[1])
     except (IndexError, ValueError):
-        int(config.get(section, "max_backups", fallback=DEFAULT_MAX_BACKUPS))
-        res = int(config.get(section, "max_backups", fallback=DEFAULT_MAX_BACKUPS))
+        mxb = int(config.get(section, "max_backups", fallback=DEFAULT_MAX_BACKUPS))
 
-    return res if res > 0 else int(config.get(section, "max_backups", fallback=DEFAULT_MAX_BACKUPS))
+    if mxb <= 0:
+        mxb = int(config.get(section, "max_backups", fallback=DEFAULT_MAX_BACKUPS))
+    return vm_name, mxb
 
 
 def is_vm_backups_valid(vm_parm):
@@ -556,11 +556,6 @@ def is_vm_backups_valid(vm_parm):
         res = False
 
     return res
-
-
-def get_vm_name(vm_parm):
-    # get vm_name from optional vm-export=VM-NAME:MAX-BACKUP override
-    return vm_parm.split(":")[0]
 
 
 def verify_vm_name(tmp_vm_name):
