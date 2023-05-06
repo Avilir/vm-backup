@@ -105,6 +105,17 @@ def select_vms(source_list):
         return tmp_list
 
 
+def uninstall_snapshot(vmsg, snap_uuid):
+    verbose(f"Cleanup old-snap-vm-uuid: {snap_uuid}")
+    command = f"vm-uninstall uuid={snap_uuid} force=true"
+    verbose(f"{vmsg}: {command}")
+    res = "success"
+    if cmd.run_xe(command, out_format="rc") != 0:
+        verbose(command, level=logging.WARNING)
+        res = "warning"
+    return res
+
+
 def main(session):
     success_cnt = 0
     warning_cnt = 0
@@ -392,13 +403,8 @@ def main(session):
         command = f"vm-list name-label='{snap_name}' params=uuid"  # | /bin/awk -F': ' '{print $2}' | /bin/grep '-'"
         old_snap_vm_uuid = cmd.run_xe(command, out_format="last")
         if old_snap_vm_uuid != "":
-            verbose(f"cleanup old-snap-vm-uuid: {old_snap_vm_uuid}")
-            # vm-uninstall old vm-snapshot
-            command = f"vm-uninstall uuid={old_snap_vm_uuid} force=true"
-            verbose(f"cmd: {command}")
-            if cmd.run_xe(command, out_format="rc") != 0:
-                verbose(command, level=logging.WARNING)
-                this_status = "warning"
+            this_status = uninstall_snapshot("cmd", old_snap_vm_uuid)
+            if this_status == "warning":
                 status_log_vm_export_end(server_name, f"VM-UNINSTALL-FAIL-1 {vm_name}")
                 # non-fatal - finsh processing for this vm
 
@@ -448,12 +454,7 @@ def main(session):
             continue
 
         # vm-uninstall vm-snapshot
-        command = f"vm-uninstall uuid={snap_vm_uuid} force=true"
-        verbose(f"4.cmd: {command}")
-        if cmd.run_xe(command, out_format="rc") != 0:
-            verbose(command, level=logging.WARNING)
-            this_status = "warning"
-            # non-fatal - finsh processing for this vm
+        this_status = uninstall_snapshot("4.cmd", snap_vm_uuid)
 
         title("vm-export end")
         # --- end vm-export command sequence ---
