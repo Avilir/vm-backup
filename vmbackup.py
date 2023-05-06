@@ -34,6 +34,7 @@ message = ""
 cmd = Command()
 
 backup_counters = {"Success": 0, "Warnings": 0, "Errors": 0}
+this_status = ""
 
 vm_uuid = ""
 xvda_uuid = ""
@@ -118,17 +119,18 @@ def uninstall_snapshot(vmsg, snap_uuid):
     return res
 
 
-def status_report(op, status, vm_name, server_name, elTime, file_size):
+def status_report(op, vm_name, server_name, elTime, file_size):
     global backup_counters
+    global this_status
     backup_time = f":{str(elTime.seconds / 60):.3} Minute"
 
     suffix_msg = f"elapse:{backup_time} Minute ; size:{file_size} G"
-    if status == "success":
+    if this_status == "success":
         backup_counters["Success"] += 1
         verbose(f"{BASE_NAME} {op} {vm_name} - *** Success *** t{backup_time}")
         status_log_vdi_export_end(server_name, f"SUCCESS {vm_name}, {suffix_msg}")
 
-    elif status == "warning":
+    elif this_status == "warning":
         backup_counters["Warnings"] += 1
         verbose(f"{BASE_NAME} {op} {vm_name} - *** WARNING *** t:{backup_time}")
         status_log_vdi_export_end(server_name, f"WARNING {vm_name},{suffix_msg}")
@@ -142,6 +144,7 @@ def status_report(op, status, vm_name, server_name, elTime, file_size):
 
 def main(session):
     global backup_counters
+    global this_status
 
     server_name = os.uname()[1].split(".")[0]
 
@@ -176,7 +179,7 @@ def main(session):
     if int(config.get(section, "pool_db_backup", fallback=DEFAULT_POOL_DB_BACKUP)):
         verbose("*** begin backup_pool_metadata ***")
         if not backup_pool_metadata(server_name):
-            error_cnt += 1
+            backup_counters["Errors"] += 1
 
     # Iterate through all vdi-export= in cfg
     title("vdi-export=")
@@ -196,7 +199,7 @@ def main(session):
         if "ERROR" in vm_object:
             verbose(f"verify_vm_name: {vm_object}")
             status_log_vdi_export_end(server_name, f"ERROR verify_vm_name {vm_name}")
-            error_cnt += 1
+            backup_counters["Errors"] += 1
             # next vm
             continue
 
@@ -219,14 +222,14 @@ def main(session):
         if xvda_uuid == "":
             verbose("gather_vm_meta has no xvda-uuid", level=logging.ERROR)
             status_log_vdi_export_end(server_name, f"ERROR xvda-uuid not found {vm_name}")
-            error_cnt += 1
+            backup_counters["Errors"] += 1
             # next vm
             continue
         debug(f"The VXDA name is : {xvda_name_label}")
         if xvda_name_label == "":
             verbose("gather_vm_meta has no xvda-name-label", level=logging.ERROR)
             status_log_vdi_export_end(server_name, f"ERROR xvda-name-label not found {vm_name}")
-            error_cnt += 1
+            backup_counters["Errors"] += 1
             # next vm
             continue
 
@@ -245,7 +248,7 @@ def main(session):
         if cmd.run_xe(command, out_format="rc") != 0:
             verbose(f"ERROR {command}", level=logging.ERROR)
             status_log_vdi_export_end(server_name, f"VDI-LIST-FAIL {vm_name}")
-            error_cnt += 1
+            backup_counters["Errors"] += 1
             # next vm
             continue
 
@@ -280,7 +283,7 @@ def main(session):
         if snap_vdi_uuid == "":
             verbose(command, level=logging.ERROR)
             status_log_vdi_export_end(server_name, f"VDI-SNAPSHOT-FAIL {vm_name}")
-            error_cnt += 1
+            backup_counters["Errors"] += 1
             # next vm
             continue
 
@@ -290,7 +293,7 @@ def main(session):
         if cmd.run_xe(command, out_format="rc") != 0:
             verbose(command, level=logging.ERROR)
             status_log_vdi_export_end(server_name, f"VDI-PARAM-SET-FAIL {vm_name}")
-            error_cnt += 1
+            backup_counters["Errors"] += 1
             # next vm
             continue
 
@@ -309,7 +312,7 @@ def main(session):
         else:
             verbose(f"{command} Failed to run", level=logging.ERROR)
             status_log_vdi_export_end(server_name, f"VDI-EXPORT-FAIL {vm_name}")
-            error_cnt += 1
+            backup_counters["Errors"] += 1
             # next vm
             continue
 
@@ -344,7 +347,7 @@ def main(session):
 
         backup_time = f":{str(elapseTime.seconds / 60):.3} Minute"
 
-        status_report("vdi-export", this_status, vm_name, server_name, elapseTime, backup_file_size)
+        status_report("vdi-export", vm_name, server_name, elapseTime, backup_file_size)
     # end of for vm_parm in config['vdi-export']:
     ######################################################################
     # Iterate through all vm-export= in cfg
@@ -364,7 +367,7 @@ def main(session):
         if "ERROR" in vm_object:
             verbose(f"verify_vm_name: {vm_object}")
             status_log_vm_export_end(server_name, f"ERROR verify_vm_name {vm_name}")
-            error_cnt += 1
+            backup_counters["Errors"] += 1
             # next vm
             continue
 
@@ -383,7 +386,7 @@ def main(session):
         if vm_uuid == "":
             verbose("gather_vm_meta has no vm-uuid", level=logging.ERROR)
             status_log_vm_export_end(server_name, f"ERROR vm-uuid not found {vm_name}")
-            error_cnt += 1
+            backup_counters["Errors"] += 1
             # next vm
             continue
 
@@ -420,7 +423,7 @@ def main(session):
         if snap_vm_uuid == "":
             verbose(command, level=logging.ERROR)
             status_log_vm_export_end(server_name, f"SNAPSHOT-FAIL {vm_name}")
-            error_cnt += 1
+            backup_counters["Errors"] += 1
             # next vm
             continue
 
@@ -430,7 +433,7 @@ def main(session):
         if cmd.run_xe(command, out_format="rc") != 0:
             verbose(command, level=logging.ERROR)
             status_log_vm_export_end(server_name, f"TEMPLATE-PARAM-SET-FAIL {vm_name}")
-            error_cnt += 1
+            backup_counters["Errors"] += 1
             # next vm
             continue
 
@@ -448,7 +451,7 @@ def main(session):
         else:
             verbose(command, level=logging.ERROR)
             status_log_vm_export_end(server_name, f"VM-EXPORT-FAIL {vm_name}")
-            error_cnt += 1
+            backup_counters["Errors"] += 1
             # next vm
             continue
 
@@ -476,7 +479,7 @@ def main(session):
                 level=logging.WARNING,
             )
             this_status = "warning"
-        status_report("vm-export", this_status, vm_name, server_name, elapseTime, backup_file_size)
+        status_report("vm-export", vm_name, server_name, elapseTime, backup_file_size)
     # end of for vm_parm in config['vm-export']:
     ######################################################################
 
