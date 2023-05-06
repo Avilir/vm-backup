@@ -116,6 +116,30 @@ def uninstall_snapshot(vmsg, snap_uuid):
     return res
 
 
+def status_report(op, status, vm_name, server_name, elTime, file_size):
+    err_cnt, war_cnt, suc_cnt = (0, 0, 0)
+    backup_time = f":{str(elTime.seconds / 60):.3} Minute"
+
+    suffix_msg = f"elapse:{backup_time} Minute ; size:{file_size} G"
+    if status == "success":
+        suc_cnt += 1
+        verbose(f"{BASE_NAME} {op} {vm_name} - *** Success *** t{backup_time}")
+        status_log_vdi_export_end(server_name, f"SUCCESS {vm_name}, {suffix_msg}")
+
+    elif status == "warning":
+        war_cnt += 1
+        verbose(f"{BASE_NAME} {op} {vm_name} - *** WARNING *** t:{backup_time}")
+        status_log_vdi_export_end(server_name, f"WARNING {vm_name},{suffix_msg}")
+
+    else:
+        # this should never occur since all errors do a continued on to the next vm_name
+        err_cnt += 1
+        verbose(f"{BASE_NAME} {op} {vm_name} - +++ ERROR-INTERNAL +++ t:{backup_time}")
+        status_log_vdi_export_end(server_name, f"ERROR-INTERNAL {vm_name},{suffix_msg}")
+
+    return err_cnt, war_cnt, suc_cnt
+
+
 def main(session):
     success_cnt = 0
     warning_cnt = 0
@@ -322,30 +346,12 @@ def main(session):
 
         backup_time = f":{str(elapseTime.seconds / 60):.3} Minute"
 
-        if this_status == "success":
-            success_cnt += 1
-            verbose(f"{BASE_NAME} vdi-export {vm_name} - ***Success*** t{backup_time}")
-            status_log_vdi_export_end(
-                server_name,
-                f"SUCCESS {vm_name},elapse:{backup_time} ; size:{backup_file_size}G",
-            )
-
-        elif this_status == "warning":
-            warning_cnt += 1
-            verbose(f"{BASE_NAME} vdi-export {vm_name} - ***WARNING*** t:{backup_time}")
-            status_log_vdi_export_end(
-                server_name, f"WARNING {vm_name},elapse:{backup_time} ; size:{backup_file_size}G"
-            )
-
-        else:
-            # this should never occur since all errors do a continued on to the next vm_name
-            error_cnt += 1
-            verbose(f"{BASE_NAME} vdi-export {vm_name} - +++ERROR-INTERNAL+++ t:{backup_time}")
-            status_log_vdi_export_end(
-                server_name,
-                f"ERROR-INTERNAL {vm_name},elapse:{backup_time} ; size:{backup_file_size}G",
-            )
-
+        err_cnt, war_cnt, suc_cnt = status_report(
+            "vdi-export", this_status, vm_name, server_name, elapseTime, backup_file_size
+        )
+        success_cnt += suc_cnt
+        warning_cnt += war_cnt
+        error_cnt += err_cnt
     # end of for vm_parm in config['vdi-export']:
     ######################################################################
     # Iterate through all vm-export= in cfg
@@ -477,23 +483,12 @@ def main(session):
                 level=logging.WARNING,
             )
             this_status = "warning"
-        suffix_msg = f"elapse:{str(elapseTime.seconds / 60)} size:{backup_file_size}G"
-        if this_status == "success":
-            success_cnt += 1
-            verbose(f"{BASE_NAME} vm-export {vm_name} - *** Success *** ; {suffix_msg}")
-            status_log_vm_export_end(server_name, f"SUCCESS {vm_name},{suffix_msg}")
-
-        elif this_status == "warning":
-            warning_cnt += 1
-            verbose(f"{BASE_NAME} vm-export {vm_name} - *** WARNING *** ; {suffix_msg}")
-            status_log_vm_export_end(server_name, f"WARNING {vm_name},{suffix_msg}")
-
-        else:
-            # this should never occur since all errors do a continued on to the next vm_name
-            error_cnt += 1
-            verbose(f"{BASE_NAME} vm-export {vm_name} - +++ ERROR-INTERNAL +++ ; {suffix_msg}")
-            status_log_vm_export_end(server_name, f"ERROR-INTERNAL {vm_name},{suffix_msg}")
-
+        err_cnt, war_cnt, suc_cnt = status_report(
+            "vm-export", this_status, vm_name, server_name, elapseTime, backup_file_size
+        )
+        success_cnt += suc_cnt
+        warning_cnt += war_cnt
+        error_cnt += err_cnt
     # end of for vm_parm in config['vm-export']:
     ######################################################################
 
