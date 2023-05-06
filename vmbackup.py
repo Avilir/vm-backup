@@ -33,6 +33,8 @@ backup_vms = list()  # list of vms to back up
 message = ""
 cmd = Command()
 
+server_name = os.uname()[1].split(".")[0]
+
 backup_counters = {"Success": 0, "Warnings": 0, "Errors": 0}
 this_status = "success"
 
@@ -119,7 +121,7 @@ def uninstall_snapshot(vmsg, snap_uuid):
     return res
 
 
-def status_report(op, vm_name, server_name, elTime, file_size):
+def status_report(op, vm_name, elTime, file_size):
     global backup_counters
     global this_status
     backup_time = f":{str(elTime.seconds / 60):.3} Minute"
@@ -128,27 +130,26 @@ def status_report(op, vm_name, server_name, elTime, file_size):
     if this_status == "success":
         backup_counters["Success"] += 1
         verbose(f"{BASE_NAME} {op} {vm_name} - *** Success *** t{backup_time}")
-        status_log_vdi_export_end(server_name, f"SUCCESS {vm_name}, {suffix_msg}")
+        status_log_vdi_export_end(f"SUCCESS {vm_name}, {suffix_msg}")
 
     elif this_status == "warning":
         backup_counters["Warnings"] += 1
         verbose(f"{BASE_NAME} {op} {vm_name} - *** WARNING *** t:{backup_time}")
-        status_log_vdi_export_end(server_name, f"WARNING {vm_name},{suffix_msg}")
+        status_log_vdi_export_end(f"WARNING {vm_name},{suffix_msg}")
 
     else:
         # this should never occur since all errors do a continued on to the next vm_name
         backup_counters["Errors"] += 1
         verbose(f"{BASE_NAME} {op} {vm_name} - +++ ERROR-INTERNAL +++ t:{backup_time}")
-        status_log_vdi_export_end(server_name, f"ERROR-INTERNAL {vm_name},{suffix_msg}")
+        status_log_vdi_export_end(f"ERROR-INTERNAL {vm_name},{suffix_msg}")
 
 
 def main(session):
     global backup_counters
     global this_status
+    global server_name
 
-    server_name = os.uname()[1].split(".")[0]
-
-    status_log_begin(server_name)
+    status_log_begin()
 
     verbose()
     verbose(f"{BASE_NAME} running on {server_name} ...")
@@ -178,7 +179,7 @@ def main(session):
 
     if int(config.get(section, "pool_db_backup", fallback=DEFAULT_POOL_DB_BACKUP)):
         verbose("*** begin backup_pool_metadata ***")
-        if not backup_pool_metadata(server_name):
+        if not backup_pool_metadata():
             backup_counters["Errors"] += 1
 
     # Iterate through all vdi-export= in cfg
@@ -192,13 +193,13 @@ def main(session):
         vm_name, vm_max_backups = get_vm_info(vm_parm)
         verbose(f"vdi-export - vm_name: {vm_name} max_backups: {vm_max_backups}")
 
-        status_log_vdi_export_begin(server_name, vm_name)
+        status_log_vdi_export_begin(vm_name)
 
         # verify vm_name exists with only one instance for this name returns error-message or vm_object if success
         vm_object = verify_vm_name(vm_name)
         if "ERROR" in vm_object:
             verbose(f"verify_vm_name: {vm_object}")
-            status_log_vdi_export_end(server_name, f"ERROR verify_vm_name {vm_name}")
+            status_log_vdi_export_end(f"ERROR verify_vm_name {vm_name}")
             backup_counters["Errors"] += 1
             # next vm
             continue
@@ -221,14 +222,14 @@ def main(session):
         # vdi-export only uses xvda_uuid, xvda_uuid
         if xvda_uuid == "":
             verbose("gather_vm_meta has no xvda-uuid", level=logging.ERROR)
-            status_log_vdi_export_end(server_name, f"ERROR xvda-uuid not found {vm_name}")
+            status_log_vdi_export_end(f"ERROR xvda-uuid not found {vm_name}")
             backup_counters["Errors"] += 1
             # next vm
             continue
         debug(f"The VXDA name is : {xvda_name_label}")
         if xvda_name_label == "":
             verbose("gather_vm_meta has no xvda-name-label", level=logging.ERROR)
-            status_log_vdi_export_end(server_name, f"ERROR xvda-name-label not found {vm_name}")
+            status_log_vdi_export_end(f"ERROR xvda-name-label not found {vm_name}")
             backup_counters["Errors"] += 1
             # next vm
             continue
@@ -247,7 +248,7 @@ def main(session):
         verbose(f"1.cmd: {command}")
         if cmd.run_xe(command, out_format="rc") != 0:
             verbose(f"ERROR {command}", level=logging.ERROR)
-            status_log_vdi_export_end(server_name, f"VDI-LIST-FAIL {vm_name}")
+            status_log_vdi_export_end(f"VDI-LIST-FAIL {vm_name}")
             backup_counters["Errors"] += 1
             # next vm
             continue
@@ -282,7 +283,7 @@ def main(session):
         verbose(f"snap-uuid: {snap_vdi_uuid}")
         if snap_vdi_uuid == "":
             verbose(command, level=logging.ERROR)
-            status_log_vdi_export_end(server_name, f"VDI-SNAPSHOT-FAIL {vm_name}")
+            status_log_vdi_export_end(f"VDI-SNAPSHOT-FAIL {vm_name}")
             backup_counters["Errors"] += 1
             # next vm
             continue
@@ -292,7 +293,7 @@ def main(session):
         verbose(f"3.cmd: {command}")
         if cmd.run_xe(command, out_format="rc") != 0:
             verbose(command, level=logging.ERROR)
-            status_log_vdi_export_end(server_name, f"VDI-PARAM-SET-FAIL {vm_name}")
+            status_log_vdi_export_end(f"VDI-PARAM-SET-FAIL {vm_name}")
             backup_counters["Errors"] += 1
             # next vm
             continue
@@ -311,7 +312,7 @@ def main(session):
             verbose("vdi-export success")
         else:
             verbose(f"{command} Failed to run", level=logging.ERROR)
-            status_log_vdi_export_end(server_name, f"VDI-EXPORT-FAIL {vm_name}")
+            status_log_vdi_export_end(f"VDI-EXPORT-FAIL {vm_name}")
             backup_counters["Errors"] += 1
             # next vm
             continue
@@ -347,7 +348,7 @@ def main(session):
 
         backup_time = f":{str(elapseTime.seconds / 60):.3} Minute"
 
-        status_report("vdi-export", vm_name, server_name, elapseTime, backup_file_size)
+        status_report("vdi-export", vm_name, elapseTime, backup_file_size)
     # end of for vm_parm in config['vdi-export']:
     ######################################################################
     # Iterate through all vm-export= in cfg
@@ -361,12 +362,12 @@ def main(session):
         vm_name, vm_max_backups = get_vm_info(vm_parm)
         verbose(f"vm-export - vm_name: {vm_name} max_backups: {vm_max_backups}")
 
-        status_log_vm_export_begin(server_name, vm_name)
+        status_log_vm_export_begin(vm_name)
 
         vm_object = verify_vm_name(vm_name)
         if "ERROR" in vm_object:
             verbose(f"verify_vm_name: {vm_object}")
-            status_log_vm_export_end(server_name, f"ERROR verify_vm_name {vm_name}")
+            status_log_vm_export_end(f"ERROR verify_vm_name {vm_name}")
             backup_counters["Errors"] += 1
             # next vm
             continue
@@ -385,7 +386,7 @@ def main(session):
         # vm-export only uses vm_uuid
         if vm_uuid == "":
             verbose("gather_vm_meta has no vm-uuid", level=logging.ERROR)
-            status_log_vm_export_end(server_name, f"ERROR vm-uuid not found {vm_name}")
+            status_log_vm_export_end(f"ERROR vm-uuid not found {vm_name}")
             backup_counters["Errors"] += 1
             # next vm
             continue
@@ -407,7 +408,7 @@ def main(session):
         if old_snap_vm_uuid != "":
             this_status = uninstall_snapshot("cmd", old_snap_vm_uuid)
             if this_status == "warning":
-                status_log_vm_export_end(server_name, f"VM-UNINSTALL-FAIL-1 {vm_name}")
+                status_log_vm_export_end(f"VM-UNINSTALL-FAIL-1 {vm_name}")
                 # non-fatal - finsh processing for this vm
 
         # === pre_cleanup code goes in here ===
@@ -422,7 +423,7 @@ def main(session):
         verbose(f"snap-uuid: {snap_vm_uuid}")
         if snap_vm_uuid == "":
             verbose(command, level=logging.ERROR)
-            status_log_vm_export_end(server_name, f"SNAPSHOT-FAIL {vm_name}")
+            status_log_vm_export_end(f"SNAPSHOT-FAIL {vm_name}")
             backup_counters["Errors"] += 1
             # next vm
             continue
@@ -432,7 +433,7 @@ def main(session):
         verbose(f"2.cmd: {command}")
         if cmd.run_xe(command, out_format="rc") != 0:
             verbose(command, level=logging.ERROR)
-            status_log_vm_export_end(server_name, f"TEMPLATE-PARAM-SET-FAIL {vm_name}")
+            status_log_vm_export_end(f"TEMPLATE-PARAM-SET-FAIL {vm_name}")
             backup_counters["Errors"] += 1
             # next vm
             continue
@@ -450,7 +451,7 @@ def main(session):
             verbose("vm-export success")
         else:
             verbose(command, level=logging.ERROR)
-            status_log_vm_export_end(server_name, f"VM-EXPORT-FAIL {vm_name}")
+            status_log_vm_export_end(f"VM-EXPORT-FAIL {vm_name}")
             backup_counters["Errors"] += 1
             # next vm
             continue
@@ -479,7 +480,7 @@ def main(session):
                 level=logging.WARNING,
             )
             this_status = "warning"
-        status_report("vm-export", vm_name, server_name, elapseTime, backup_file_size)
+        status_report("vm-export", vm_name, elapseTime, backup_file_size)
     # end of for vm_parm in config['vm-export']:
     ######################################################################
 
@@ -490,15 +491,15 @@ def main(session):
     status_log = config.get(section, "status_log", fallback=DEFAULT_STATUS_LOG)
     sub_suffix = f"{os.uname()[1]} {BASE_NAME}.py"
     if backup_counters["Errors"] > 0:
-        status_log_end(server_name, f"ERROR,{backup_counters}")
+        status_log_end(f"ERROR,{backup_counters}")
         send_email(f"ERROR {sub_suffix}", status_log)
         verbose(f"{BASE_NAME} ended - ** ERRORS DETECTED ** - {backup_counters}")
     elif backup_counters["Warnings"] > 0:
-        status_log_end(server_name, f"WARNING,{backup_counters}")
+        status_log_end(f"WARNING,{backup_counters}")
         send_email(f"WARNING {sub_suffix}", status_log)
         verbose(f"{BASE_NAME} ended - ** WARNING(s) ** - {backup_counters}")
     else:
-        status_log_end(server_name, f"SUCCESS,{backup_counters}")
+        status_log_end(f"SUCCESS,{backup_counters}")
         send_email(f"Success {sub_suffix}", status_log)
         verbose(f"{BASE_NAME} ended - Success - {backup_counters}")
 
@@ -844,7 +845,7 @@ def check_all_backups_success(path):
     return True
 
 
-def backup_pool_metadata(svr_name):
+def backup_pool_metadata():
     """
     Backing up the db pool metadata
 
@@ -854,6 +855,7 @@ def backup_pool_metadata(svr_name):
     Return:
         bool : True if dumped OK, otherwise False
     """
+    global server_name
     # xe-backup-metadata can only run on master
     if not is_xe_master():
         verbose("** ignore: NOT master")
@@ -861,7 +863,7 @@ def backup_pool_metadata(svr_name):
 
     metadata_base = os.path.join(
         config.get(section, "backup_dir", fallback=DEFAULT_BACKUP_DIR),
-        "METADATA_" + svr_name,
+        "METADATA_" + server_name,
     )
     if cmd.run_remote(f"mkdir -p {metadata_base}", out_format="rc") != 0:
         verbose(f"creating directory {metadata_base} Failed", level=logging.ERROR)
@@ -1087,36 +1089,37 @@ def get_all_vms():
     all_vms = cmd.run_xe(command, out_format="string").split(",")
 
 
-def write_status_log_msg(op, server, script=f"{BASE_NAME}.py", status=""):
+def write_status_log_msg(op, script=f"{BASE_NAME}.py", status=""):
+    global server_name
     date = time.strftime("%Y/%m/%d %H:%M:%S")
-    msg = f"{date},{script},{server},{op} {status}\n"
+    msg = f"{date},{script},{server_name},{op} {status}\n"
     with open(config.get(section, "status_log", fallback=DEFAULT_STATUS_LOG), "a") as fh:
         fh.write(msg)
     debug(msg.strip())
 
 
-def status_log_begin(server):
-    write_status_log_msg(op="begin", server=server)
+def status_log_begin():
+    write_status_log_msg(op="begin")
 
 
-def status_log_end(server, status):
-    write_status_log_msg(op="end", server=server, status=status)
+def status_log_end(status):
+    write_status_log_msg(op="end", status=status)
 
 
-def status_log_vm_export_begin(server, status):
-    write_status_log_msg(op="begin", server=server, status=status, script="vm-export")
+def status_log_vm_export_begin(status):
+    write_status_log_msg(op="begin", status=status, script="vm-export")
 
 
-def status_log_vm_export_end(server, status):
-    write_status_log_msg(op="end", server=server, status=status, script="vm-export")
+def status_log_vm_export_end(status):
+    write_status_log_msg(op="end", status=status, script="vm-export")
 
 
-def status_log_vdi_export_begin(server, status):
-    write_status_log_msg(op="begin", server=server, status=status, script="vdi-export")
+def status_log_vdi_export_begin(status):
+    write_status_log_msg(op="begin", status=status, script="vdi-export")
 
 
-def status_log_vdi_export_end(server, status):
-    write_status_log_msg(op="end", server=server, status=status, script="vdi-export")
+def status_log_vdi_export_end(status):
+    write_status_log_msg(op="end", status=status, script="vdi-export")
 
 
 if __name__ == "__main__":
