@@ -404,7 +404,7 @@ def main(session):
         snap_name = f"RESTORE_{vm_name}"
         verbose(f"check for prev-vm-snapshot: {snap_name}")
         command = f"vm-list name-label='{snap_name}' params=uuid"  # | /bin/awk -F': ' '{print $2}' | /bin/grep '-'"
-        old_snap_vm_uuid = cmd.run_xe(command, out_format="last")
+        old_snap_vm_uuid = cmd.run_xe(command, out_format="last").split(":")[-1]
         if old_snap_vm_uuid != "":
             this_status = uninstall_snapshot("cmd", old_snap_vm_uuid)
             if this_status == "warning":
