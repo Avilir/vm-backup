@@ -34,7 +34,7 @@ message = ""
 cmd = Command()
 
 backup_counters = {"Success": 0, "Warnings": 0, "Errors": 0}
-this_status = ""
+this_status = "success"
 
 vm_uuid = ""
 xvda_uuid = ""
