@@ -149,7 +149,7 @@ def main(session):
     global this_status
     global server_name
 
-    status_log_begin()
+    write_status_log_msg(op="begin")
 
     verbose()
     verbose(f"{BASE_NAME} running on {server_name} ...")
@@ -193,7 +193,7 @@ def main(session):
         vm_name, vm_max_backups = get_vm_info(vm_parm)
         verbose(f"vdi-export - vm_name: {vm_name} max_backups: {vm_max_backups}")
 
-        status_log_vdi_export_begin(vm_name)
+        write_status_log_msg(op="begin", status=vm_name, script="vdi-export")
 
         # verify vm_name exists with only one instance for this name returns error-message or vm_object if success
         vm_object = verify_vm_name(vm_name)
@@ -362,7 +362,7 @@ def main(session):
         vm_name, vm_max_backups = get_vm_info(vm_parm)
         verbose(f"vm-export - vm_name: {vm_name} max_backups: {vm_max_backups}")
 
-        status_log_vm_export_begin(vm_name)
+        write_status_log_msg(op="begin", status=vm_name, script="vm-export")
 
         vm_object = verify_vm_name(vm_name)
         if "ERROR" in vm_object:
@@ -1098,24 +1098,12 @@ def write_status_log_msg(op, script=f"{BASE_NAME}.py", status=""):
     debug(msg.strip())
 
 
-def status_log_begin():
-    write_status_log_msg(op="begin")
-
-
 def status_log_end(status):
     write_status_log_msg(op="end", status=status)
 
 
-def status_log_vm_export_begin(status):
-    write_status_log_msg(op="begin", status=status, script="vm-export")
-
-
 def status_log_vm_export_end(status):
     write_status_log_msg(op="end", status=status, script="vm-export")
-
-
-def status_log_vdi_export_begin(status):
-    write_status_log_msg(op="begin", status=status, script="vdi-export")
 
 
 def status_log_vdi_export_end(status):
