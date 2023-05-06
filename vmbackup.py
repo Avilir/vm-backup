@@ -33,6 +33,8 @@ backup_vms = list()  # list of vms to back up
 message = ""
 cmd = Command()
 
+backup_counters = {"Success": 0, "Warnings": 0, "Errors": 0}
+
 vm_uuid = ""
 xvda_uuid = ""
 xvda_name_label = ""
@@ -117,33 +119,29 @@ def uninstall_snapshot(vmsg, snap_uuid):
 
 
 def status_report(op, status, vm_name, server_name, elTime, file_size):
-    err_cnt, war_cnt, suc_cnt = (0, 0, 0)
+    global backup_counters
     backup_time = f":{str(elTime.seconds / 60):.3} Minute"
 
     suffix_msg = f"elapse:{backup_time} Minute ; size:{file_size} G"
     if status == "success":
-        suc_cnt += 1
+        backup_counters["Success"] += 1
         verbose(f"{BASE_NAME} {op} {vm_name} - *** Success *** t{backup_time}")
         status_log_vdi_export_end(server_name, f"SUCCESS {vm_name}, {suffix_msg}")
 
     elif status == "warning":
-        war_cnt += 1
+        backup_counters["Warnings"] += 1
         verbose(f"{BASE_NAME} {op} {vm_name} - *** WARNING *** t:{backup_time}")
         status_log_vdi_export_end(server_name, f"WARNING {vm_name},{suffix_msg}")
 
     else:
         # this should never occur since all errors do a continued on to the next vm_name
-        err_cnt += 1
+        backup_counters["Errors"] += 1
         verbose(f"{BASE_NAME} {op} {vm_name} - +++ ERROR-INTERNAL +++ t:{backup_time}")
         status_log_vdi_export_end(server_name, f"ERROR-INTERNAL {vm_name},{suffix_msg}")
 
-    return err_cnt, war_cnt, suc_cnt
-
 
 def main(session):
-    success_cnt = 0
-    warning_cnt = 0
-    error_cnt = 0
+    global backup_counters
 
     server_name = os.uname()[1].split(".")[0]
 
@@ -346,12 +344,7 @@ def main(session):
 
         backup_time = f":{str(elapseTime.seconds / 60):.3} Minute"
 
-        err_cnt, war_cnt, suc_cnt = status_report(
-            "vdi-export", this_status, vm_name, server_name, elapseTime, backup_file_size
-        )
-        success_cnt += suc_cnt
-        warning_cnt += war_cnt
-        error_cnt += err_cnt
+        status_report("vdi-export", this_status, vm_name, server_name, elapseTime, backup_file_size)
     # end of for vm_parm in config['vdi-export']:
     ######################################################################
     # Iterate through all vm-export= in cfg
@@ -483,12 +476,7 @@ def main(session):
                 level=logging.WARNING,
             )
             this_status = "warning"
-        err_cnt, war_cnt, suc_cnt = status_report(
-            "vm-export", this_status, vm_name, server_name, elapseTime, backup_file_size
-        )
-        success_cnt += suc_cnt
-        warning_cnt += war_cnt
-        error_cnt += err_cnt
+        status_report("vm-export", this_status, vm_name, server_name, elapseTime, backup_file_size)
     # end of for vm_parm in config['vm-export']:
     ######################################################################
 
@@ -496,22 +484,20 @@ def main(session):
     df_snapshots(f"Space status", min_capacity=1)
 
     # gather a final vmbackup.py status
-    summary = f"Success:{success_cnt}; Warnings:{warning_cnt}; Errors:{error_cnt}"
-
     status_log = config.get(section, "status_log", fallback=DEFAULT_STATUS_LOG)
     sub_suffix = f"{os.uname()[1]} {BASE_NAME}.py"
-    if error_cnt > 0:
-        status_log_end(server_name, f"ERROR,{summary}")
+    if backup_counters["Errors"] > 0:
+        status_log_end(server_name, f"ERROR,{backup_counters}")
         send_email(f"ERROR {sub_suffix}", status_log)
-        verbose(f"{BASE_NAME} ended - ** ERRORS DETECTED ** - {summary}")
-    elif warning_cnt > 0:
-        status_log_end(server_name, f"WARNING,{summary}")
+        verbose(f"{BASE_NAME} ended - ** ERRORS DETECTED ** - {backup_counters}")
+    elif backup_counters["Warnings"] > 0:
+        status_log_end(server_name, f"WARNING,{backup_counters}")
         send_email(f"WARNING {sub_suffix}", status_log)
-        verbose(f"{BASE_NAME} ended - ** WARNING(s) ** - {summary}")
+        verbose(f"{BASE_NAME} ended - ** WARNING(s) ** - {backup_counters}")
     else:
-        status_log_end(server_name, f"SUCCESS,{summary}")
+        status_log_end(server_name, f"SUCCESS,{backup_counters}")
         send_email(f"Success {sub_suffix}", status_log)
-        verbose(f"{BASE_NAME} ended - Success - {summary}")
+        verbose(f"{BASE_NAME} ended - Success - {backup_counters}")
 
     # done with main()
     ######################################################################
